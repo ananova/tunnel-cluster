@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+
+# tunnel_cluster - Database tunneling through ECS containers
+#
+# Usage: tunnel_cluster <environment> <action>
+#   environment: See config.json for available environments
+#   action: db (tunnel to database), shell (interactive shell access)
+#
+# Examples:
+#   tunnel_cluster my-service-production db
+#   tunnel_cluster my-service-staging shell
+
+set -euo pipefail
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+config_file="${script_dir}/config.json"
+
+if [[ ! -f "$config_file" ]]; then
+    echo "Config file not found: $config_file"
+    echo "Copy config.json.example and customize it"
+    exit 1
+fi
+
+# Load config using jq
+load_config() {
+    local environment="$1"
+    
+    if ! command -v jq >/dev/null 2>&1; then
+        echo "jq is required but not installed" >&2
+        exit 1
+    fi
+    
+    # Check if environment exists
+    if ! jq -e ".environments[\"$environment\"]" "$config_file" >/dev/null 2>&1; then
+        echo "Environment not found: $environment" >&2
+        return 1
+    fi
+    
+    local env_config base_name
+    env_config=$(jq -r ".environments[\"$environment\"]" "$config_file")
+    
+    # Check if it extends a base config
+    base_name=$(echo "$env_config" | jq -r '.extends // empty')
+    
+    if [[ -n "$base_name" ]]; then
+        # Merge base config with environment config
+        jq -r --arg env "$environment" --arg base "$base_name" '
+            (.base_configs[$base] // {}) * (.environments[$env] // {}) |
+            del(.extends) |
+            if .db_prefix and (.db_host | not) then
+                .db_host = "\(.db_prefix).cluster-ro-\(.rds_endpoint)"
+            else . end |
+            to_entries[] | "\(.key)=\"\(.value)\""
+        ' "$config_file"
+    else
+        # Just use environment config directly
+        echo "$env_config" | jq -r 'to_entries[] | "\(.key)=\"\(.value)\""'
+    fi
+}
+
+if [[ $# -lt 2 ]]; then
+    echo "Usage: $0 <environment> <action>"
+    echo
+    echo "Environments:"
+    jq -r '.environments | keys[] | "  " + .' "$config_file" | sort
+    echo
+    echo "Actions:"
+    echo "  db - tunnel to database"
+    echo "  shell - interactive shell access"
+    exit 1
+fi
+
+environment="$1"
+action="$2"
+db_port=5432
+
+# Load and resolve configuration
+if ! config_vars=$(load_config "$environment"); then
+    echo ""
+    echo "Available environments:"
+    jq -r '.environments | keys[] | "  " + .' "$config_file" | sort
+    exit 1
+fi
+
+# Export configuration variables
+eval "$config_vars"
+
+case "$action" in
+    "db")
+        exec aws-vault exec "${aws_profile}" -- "${script_dir}/remote_db.sh" "${aws_region}" "${cluster}" "${service}" "${db_host}" "${db_port}" "${local_port}"
+        ;;
+    "shell")
+        exec aws-vault exec "${aws_profile}" -- "${script_dir}/remote_shell.sh" "${aws_region}" "${cluster}" "${service}" "${container}"
+        ;;
+    *)
+        echo "Unknown action: $action"
+        echo "Available actions: db, shell"
+        exit 1
+        ;;
+esac

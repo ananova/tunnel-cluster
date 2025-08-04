@@ -1,0 +1,32 @@
+{
+  "base_configs": {
+    "production": {
+      "aws_profile": "your-production-profile",
+      "aws_region": "us-east-1",
+      "rds_endpoint": "YOUR_PROD_RDS_ENDPOINT"
+    },
+    "staging": {
+      "aws_profile": "your-staging-profile",
+      "aws_region": "us-west-2", 
+      "rds_endpoint": "YOUR_STAGING_RDS_ENDPOINT"
+    }
+  },
+  "environments": {
+    "my-service-production": {
+      "extends": "production",
+      "cluster": "my_ecs_cluster",
+      "service": "my_service_web",
+      "container": "app",
+      "db_prefix": "my-service-db-cluster",
+      "local_port": 15432
+    },
+    "my-service-staging": {
+      "extends": "staging",
+      "cluster": "my_ecs_cluster",
+      "service": "my_service_web",
+      "container": "app",
+      "db_prefix": "my-service-db-cluster",
+      "local_port": 15433
+    }
+  }
+}
