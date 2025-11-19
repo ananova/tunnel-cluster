@@ -1,8 +1,8 @@
-# Tunnel Cluster Manager
+# Tunnel Cluster
 
-A web-based UI for managing AWS RDS database tunnels across multiple environments.
+A tool for managing database tunnels and ECS container shell access across multiple environments. Includes a web UI for convenient management of database tunnels.
 
-## Features
+## eatures
 
 - Visual interface for all configured database environments
 - Start/stop tunnels with a single click
@@ -35,6 +35,71 @@ A web-based UI for managing AWS RDS database tunnels across multiple environment
    http://localhost:31415
    ```
 
+## Configuration
+
+Create a `config.json` file in the project root. This file defines base AWS configurations and individual environments.
+
+### Example Configuration
+
+```json
+{
+  "base_configs": {
+    "production_account": {
+      "aws_profile": "developer@production",
+      "aws_region": "us-east-1",
+      "rds_endpoint": "abc123.us-east-1.rds.amazonaws.com"
+    },
+    "staging_account": {
+      "aws_profile": "developer@staging",
+      "aws_region": "ap-southeast-2",
+      "rds_endpoint": "xyz789.ap-southeast-2.rds.amazonaws.com"
+    }
+  },
+  "environments": {
+    "my-service-production": {
+      "extends": "production_account",
+      "cluster": "my_ecs_cluster",
+      "service": "my_service_web",
+      "container": "app",
+      "db_prefix": "my-service-db-cluster",
+      "local_port": 15432
+    },
+    "my-service-staging": {
+      "extends": "staging_account",
+      "cluster": "staging_ecs_cluster",
+      "service": "my_service_web",
+      "container": "app",
+      "db_prefix": "my-service-db-cluster",
+      "local_port": 15433
+    },
+    "another-service-production": {
+      "extends": "production_account",
+      "cluster": "my_ecs_cluster",
+      "service": "another_service_web",
+      "container": "app",
+      "db_host": "custom-db.example.com",
+      "local_port": 15434
+    }
+  }
+}
+```
+
+### Configuration Fields
+
+**Base Configs:**
+- `aws_profile`: AWS profile name (used with aws-vault)
+- `aws_region`: AWS region for the infrastructure
+- `rds_endpoint`: RDS cluster endpoint
+
+**Environments:**
+- `extends`: References a base config to inherit from
+- `cluster`: ECS cluster name
+- `service`: ECS service name
+- `container`: Container name within the service
+- `db_prefix`: Optional database cluster name prefix (auto-constructs full RDS endpoint). If not specified, auto-generated from environment name by removing `-production` or `-staging` suffix and appending `-db-cluster`
+- `db_host`: Optional explicit database host (overrides db_prefix). Use this for custom database hostnames
+- `local_port`: Local port to bind the tunnel to (must be unique per environment)
+
 ## Usage
 
 ### Starting a Tunnel
@@ -52,7 +117,24 @@ A web-based UI for managing AWS RDS database tunnels across multiple environment
 
 ### Auto-Refresh
 
-Toggle the "Auto-refresh" switch to automatically update tunnel statuses every 3 seconds.
+Toggle the "Auto-refresh" switch to automatically update tunnel statuses periodically.
+
+### Shell Access (Command Line Only)
+
+The web UI manages database tunnels only. For interactive shell access to ECS containers, use the command line:
+
+```bash
+./tunnel_cluster <environment-name> shell
+```
+
+This opens an interactive bash shell inside the ECS container for the specified environment. Useful for debugging, running rake tasks, or inspecting the container environment.
+
+Example:
+```bash
+./tunnel_cluster my-service-production shell
+```
+
+Press Ctrl-D or type `exit` to close the shell session.
 
 ## API Endpoints
 
