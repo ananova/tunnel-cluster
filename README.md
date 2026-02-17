@@ -2,7 +2,7 @@
 
 A tool for managing database tunnels and ECS container shell access across multiple environments. Includes a web UI for convenient management of database tunnels.
 
-## eatures
+## Features
 
 - Visual interface for all configured database environments
 - Start/stop tunnels with a single click
