@@ -85,6 +85,35 @@ fi
 # Export configuration variables
 eval "$config_vars"
 
+
+# ---- GPET BASTIONS -----------------------------------------------------------
+if [[ -n "${expected_aws_account_id:-}" ]]; then
+  if [[ -z "${aws_profile:-}" ]]; then
+    echo "Error: bastion-based forwarding requires aws_profile" >&2
+    exit 1
+  fi
+  if [[ -z "${aws_region:-}" ]]; then
+    echo "Error: bastion-based forwarding requires aws_region" >&2
+    exit 1
+  fi
+  if [[ -z "${db_host:-}" ]]; then
+    echo "Error: bastion-based forwarding requires db_host" >&2
+    exit 1
+  fi
+  if [[ -z "${local_port:-}" ]]; then
+    echo "Error: bastion-based forwarding requires local_port" >&2
+    exit 1
+  fi
+  if [[ -z "${expected_aws_account_name:-}" ]]; then
+    echo "Error: bastion-based forwarding requires expected_aws_account_name" >&2
+    exit 1
+  fi
+  exec aws-vault exec "${aws_profile}" -- "${script_dir}/port_forward.sh" "${aws_region}" "${db_host}" "${db_port}" "${local_port}" "${expected_aws_account_id}" "${expected_aws_account_name}"
+  exit 0
+fi
+# ------------------------------------------------------------------------------
+
+
 # Determine if we're using service or task_family
 if [[ -n "${service:-}" ]]; then
     ecs_type="service"
