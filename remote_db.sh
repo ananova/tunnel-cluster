@@ -22,27 +22,15 @@ fi
 
 # Accept and validate input arguments
 if [[ -z "${1:-}" || -z "${2:-}" || -z "${3:-}" || -z "${4:-}" || -z "${5:-}" || -z "${6:-}" ]]; then
-  >&2 echo "Usage: $0 <aws_region> <cluster> <service> <remote_host> <remote_port> <local_port>"
+  >&2 echo "Usage: $0 <aws_region> <cluster> <task_arn> <remote_host> <remote_port> <local_port>"
   exit 2
 fi
 aws_region="$1"
 cluster="$2"
-service="$3"
+task_arn="$3"
 remote_host="$4"
 remote_port="$5"
 local_port="$6"
-
-task_arn=$(aws ecs list-tasks \
-    --cluster "$cluster" \
-    --service-name "$service" \
-    --region "$aws_region" \
-    --query 'taskArns[0]' \
-    --output text)
-
-if [ -z "$task_arn" ] || [ "$task_arn" = "None" ]; then
-    echo "Error: Unable to retrieve ECS task ARN" >&2
-    exit 1
-fi
 
 task_runtime_id=$(aws ecs describe-tasks \
     --cluster "$cluster" \

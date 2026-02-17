@@ -21,25 +21,13 @@ fi
 
 # Accept and validate input arguments
 if [[ -z "${1:-}" || -z "${2:-}" || -z "${3:-}" || -z "${4:-}" ]]; then
-  >&2 echo "Usage: $0 <aws_region> <cluster> <service> <container>"
+  >&2 echo "Usage: $0 <aws_region> <cluster> <task_arn> <container>"
   exit 2
 fi
 aws_region="$1"
 cluster="$2"
-service="$3"
+task_arn="$3"
 container="$4"
-
-task_arn=$(aws ecs list-tasks \
-    --cluster "$cluster" \
-    --service-name "$service" \
-    --region "$aws_region" \
-    --query 'taskArns[0]' \
-    --output text)
-
-if [ -z "$task_arn" ] || [ "$task_arn" = "None" ]; then
-    echo "Error: Unable to retrieve ECS task ARN" >&2
-    exit 1
-fi
 
 echo "Connecting to task: ${task_arn}..."
 exec aws ecs execute-command \

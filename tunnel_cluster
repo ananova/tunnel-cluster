@@ -85,12 +85,50 @@ fi
 # Export configuration variables
 eval "$config_vars"
 
+# Determine if we're using service or task_family
+if [[ -n "${service:-}" ]]; then
+    ecs_type="service"
+    ecs_name="${service}"
+elif [[ -n "${task_family:-}" ]]; then
+    ecs_type="task_family"
+    ecs_name="${task_family}"
+else
+    echo "Error: Configuration must specify either 'service' or 'task_family'" >&2
+    exit 1
+fi
+
+# Get the task ARN based on service or task family
+echo "Looking up task ARN..."
+if [[ "$ecs_type" == "service" ]]; then
+    task_arn=$(aws-vault exec "${aws_profile}" -- aws ecs list-tasks \
+        --cluster "$cluster" \
+        --service-name "$ecs_name" \
+        --region "$aws_region" \
+        --query 'taskArns[0]' \
+        --output text)
+elif [[ "$ecs_type" == "task_family" ]]; then
+    task_arn=$(aws-vault exec "${aws_profile}" -- aws ecs list-tasks \
+        --cluster "$cluster" \
+        --family "$ecs_name" \
+        --region "$aws_region" \
+        --query 'taskArns[0]' \
+        --output text)
+else
+    echo "Error: Invalid type '$ecs_type'. Must be 'service' or 'task_family'" >&2
+    exit 1
+fi
+
+if [[ -z "$task_arn" ]] || [[ "$task_arn" == "None" ]]; then
+    echo "Error: Unable to retrieve ECS task ARN" >&2
+    exit 1
+fi
+
 case "$action" in
     "db")
-        exec aws-vault exec "${aws_profile}" -- "${script_dir}/remote_db.sh" "${aws_region}" "${cluster}" "${service}" "${db_host}" "${db_port}" "${local_port}"
+        exec aws-vault exec "${aws_profile}" -- "${script_dir}/remote_db.sh" "${aws_region}" "${cluster}" "${task_arn}" "${db_host}" "${db_port}" "${local_port}"
         ;;
     "shell")
-        exec aws-vault exec "${aws_profile}" -- "${script_dir}/remote_shell.sh" "${aws_region}" "${cluster}" "${service}" "${container}"
+        exec aws-vault exec "${aws_profile}" -- "${script_dir}/remote_shell.sh" "${aws_region}" "${cluster}" "${task_arn}" "${container}"
         ;;
     *)
         echo "Unknown action: $action"
