@@ -21,6 +21,8 @@ function loadConfig() {
     environments.push({
       name,
       service: env.service,
+      taskFamily: env.task_family,
+      dbHost: env.db_host,
       localPort: env.local_port,
       awsProfile: baseConfig.aws_profile,
       region: baseConfig.aws_region,
